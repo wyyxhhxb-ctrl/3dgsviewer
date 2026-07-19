@@ -6,33 +6,31 @@
     <style>
         body {
             margin: 0;
-            padding: 5px; /* Add some padding around the viewer */
+            padding: 5px;
             overflow: hidden;
-            background-color: #2b2b2b; /* Dark grey background */
-            font-family: Arial, sans-serif; /* Use a common sans-serif font */
-            color: #ffffff; /* White text color */
-            height: calc(100vh - 10px); /* Account for padding */
-            display: flex; /* Use flexbox for centering/loading */
-            flex-direction: column; /* Stack content vertically */
+            background-color: #2b2b2b;
+            font-family: Arial, sans-serif;
+            color: #ffffff;
+            height: calc(100vh - 10px);
         }
 
         #container {
             width: 100%;
             height: 100%;
-            position: relative; /* For overlay positioning */
-            border-radius: 8px; /* Optional: rounded corners */
-            box-sizing: border-box; /* Include padding in dimensions */
+            position: relative;
+            border-radius: 8px;
+            box-sizing: border-box;
         }
 
         #infoOverlay {
             position: absolute;
-            top: 40px; /* Adjust based on desired position from top */
-            left: 10px; /* Adjust based on desired position from left */
-            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+            top: 40px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
-            z-index: 10; /* Ensure it's above the canvas */
-            pointer-events: none; /* Allow interaction with canvas underneath */
+            z-index: 10;
+            pointer-events: none;
             font-size: 14px;
         }
 
@@ -42,47 +40,46 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 18px;
-            z-index: 5; /* Behind info overlay but above canvas */
+            z-index: 5;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
             text-align: center;
         }
 
         #errorDisplay {
-             position: absolute;
-             top: 50%;
-             left: 50%;
-             transform: translate(-50%, -50%);
-             font-size: 16px;
-             color: #ff5555; /* Red error color */
-             z-index: 6; /* Above loading indicator */
-             display: none; /* Hidden by default */
-             text-align: center;
-             background-color: rgba(0, 0, 0, 0.7);
-             padding: 20px;
-             border-radius: 8px;
-         }
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #ff5555;
+            z-index: 6;
+            display: none;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 8px;
+        }
 
-         #controlsHelp {
-             position: absolute;
-             bottom: 10px;
-             left: 10px;
-             background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
-             padding: 8px 12px;
-             border-radius: 5px;
-             z-index: 10; /* Ensure it's above the canvas */
-             pointer-events: none; /* Allow interaction with canvas underneath */
-             font-size: 12px;
-             line-height: 1.4;
-         }
+        #controlsHelp {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 5px;
+            z-index: 10;
+            pointer-events: none;
+            font-size: 12px;
+            line-height: 1.4;
+        }
 
-         #controlsHelp p {
-             margin: 0.2em 0; /* Reduce space between instructions */
-         }
+        #controlsHelp p {
+            margin: 0.2em 0;
+        }
 
-        /* Basic canvas styling */
         canvas {
             display: block;
             width: 100%;
@@ -90,18 +87,15 @@
         }
     </style>
 
-    <!-- Import Potree and dependencies -->
     <script src='https://unpkg.com/three@0.160.0/build/three.min.js'></script>
     <script src='https://unpkg.com/potree@1.8.1/build/Potree.js'></script>
     <link rel="stylesheet" href="https://unpkg.com/potree@1.8.1/build/potree.css">
-
 </head>
 <body>
-
     <div id="container">
         <div id="loadingIndicator">
             <p>正在加载点云...</p>
-            <p id="progressText">进度: 0%</p> <!-- Added progress text element -->
+            <p id="progressText">进度: 0%</p>
         </div>
         <div id="errorDisplay"></div>
         <div id="infoOverlay">
@@ -117,131 +111,87 @@
     </div>
 
     <script type="module">
-        import {initPotreeViewer} from 'https://esm.run/potree@1.8.1/viewer/index.mjs';
+        import { initPotreeViewer } from 'https://esm.run/potree@1.8.1/viewer/index.mjs';
 
-        // --- Configuration ---
-        const container = document.getElementById('container');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const progressText = document.getElementById('progressText'); // Get progress text element
-        const errorDisplay = document.getElementById('errorDisplay');
-        const pointCountInfo = document.getElementById('pointCountInfo');
-        const boundsInfo = document.getElementById('boundsInfo');
+        // 将所有逻辑放入 IIFE（立即执行函数），避免顶层 return
+        (async () => {
+            const container = document.getElementById('container');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const progressText = document.getElementById('progressText');
+            const errorDisplay = document.getElementById('errorDisplay');
+            const pointCountInfo = document.getElementById('pointCountInfo');
+            const boundsInfo = document.getElementById('boundsInfo');
 
-        // --- URL Parameter Handling ---
-        function getURLParameter(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
-        }
-
-        const plyUrl = getURLParameter('ply');
-        if (!plyUrl) {
-            console.error("未提供 PLY 文件 URL。请使用 '?ply=YOUR_PLY_URL' 参数。");
-            showError("错误：未提供 PLY 文件 URL。请检查网址参数。");
-            loadingIndicator.style.display = 'none'; // Hide initial loading message
-             // Do not return here as we still want the script to run potentially later if URL changes, though typically this means failure.
-        } else {
-             // Sanitize the URL (basic check, consider more robust validation if needed)
-             try {
-                 new URL(plyUrl); // This will throw an error if the URL is malformed
-             } catch (e) {
-                 console.error("提供的 PLY URL 无效:", e);
-                 showError("错误：提供的 PLY 文件 URL 无效。");
-                 loadingIndicator.style.display = 'none';
-                 plyUrl = null; // Indicate failure
-             }
-        }
-
-
-        // --- Potree Viewer Initialization ---
-        async function initializeViewer() {
-            if (!plyUrl) {
-                 console.warn("PLY URL 无效或缺失，无法初始化查看器。");
-                 return; // Exit if no valid URL
+            function showError(message) {
+                errorDisplay.textContent = message;
+                errorDisplay.style.display = 'block';
+                loadingIndicator.style.display = 'none';
             }
+
+            // 获取 URL 参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const plyUrl = urlParams.get('ply');
+
+            if (!plyUrl) {
+                showError("错误：未提供 PLY 文件 URL。请使用 ?ply=YOUR_URL");
+                return; // ✅ 现在在函数内，合法！
+            }
+
+            // 验证 URL 格式
             try {
-                // Initialize Potree viewer instance
+                new URL(plyUrl);
+            } catch (e) {
+                showError("错误：PLY URL 格式无效");
+                return;
+            }
+
+            try {
                 const viewer = await initPotreeViewer({
-                    container: container,
-                    useCompatibilityRenderer: true, // Enable compatibility renderer for better browser support
-                    onProgress: (promises) => { // Listen for progress updates
+                    container,
+                    useCompatibilityRenderer: true,
+                    onProgress: (promises) => {
                         Promise.allSettled(promises).then(results => {
-                            let numResolved = results.filter(r => r.status === 'fulfilled').length;
-                            let percentage = (numResolved / promises.length * 100).toFixed(2);
-                            progressText.textContent = `进度: ${percentage}%`; // Update progress text
-                            if(percentage >= 100) {
-                                setTimeout(() => { // Small delay before hiding
+                            const numResolved = results.filter(r => r.status === 'fulfilled').length;
+                            const percentage = (numResolved / promises.length * 100).toFixed(1);
+                            progressText.textContent = `进度: ${percentage}%`;
+                            if (percentage >= 100) {
+                                setTimeout(() => {
                                     loadingIndicator.style.display = 'none';
-                                }, 500); // Hide after 0.5s when complete
+                                }, 500);
                             }
                         });
                     }
                 });
 
-                // Load the PLY file using Potree's loader
-                // Potree expects a path relative to its resources or an absolute path that it can handle.
-                // We pass the full URL directly here.
-                const measurementTool = new Potree.MeasuringTool(viewer.scene);
-
-                // Load the point cloud
-                const {pointclouds} = await Potree.loadPointCloud(plyUrl, "loadedCloud", viewer);
-
+                const { pointclouds } = await Potree.loadPointCloud(plyUrl, "loadedCloud", viewer);
                 const pointcloud = pointclouds[0];
-                if(pointcloud) {
-                    viewer.scene.addPointCloud(pointcloud);
-                    pointcloud.material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-                    pointcloud.material.size = 1;
-                    pointcloud.showBoundingBox = false;
 
-                    // Fit to view
-                    viewer.fitToScreen();
-
-                    // --- Update Info Overlay ---
-                    // Point Count
-                    const numPoints = pointcloud.numPoints || pointcloud.geometry.attributes.position.count;
-                    pointCountInfo.textContent = `点数: ${numPoints?.toLocaleString() || 'N/A'}`;
-
-                    // Bounds (assuming bounding box is available after loading)
-                    const bbox = pointcloud.boundingBox || pointcloud.geometry.boundingBox;
-                    if (bbox) {
-                        boundsInfo.textContent = `边界: Min(${bbox.min.x.toFixed(2)}, ${bbox.min.y.toFixed(2)}, ${bbox.min.z.toFixed(2)}), Max(${bbox.max.x.toFixed(2)}, ${bbox.max.y.toFixed(2)}, ${bbox.max.z.toFixed(2)})`;
-                    } else {
-                        boundsInfo.textContent = '边界: N/A';
-                    }
-
-                    // Hide loading after fitToScreen animation potentially finishes or after a short delay
-                    // The onProgress handler should handle this primarily now.
-
-                } else {
-                     throw new Error("未能从加载的资源中获取点云对象。");
+                if (!pointcloud) {
+                    throw new Error("无法加载点云数据");
                 }
 
-                // --- Set up event listeners for controls help ---
-                // These might not be directly Potree-specific but standard mouse events Potree uses
-                // The help text itself provides the primary user guidance.
-                // viewer.inputHandler.on("mouseDown", (event) => { ... }); // Potree internal events are harder to access directly like this
+                viewer.scene.addPointCloud(pointcloud);
+                pointcloud.material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+                pointcloud.material.size = 1;
+                pointcloud.showBoundingBox = false;
+                viewer.fitToScreen();
+
+                // 更新信息面板
+                const numPoints = pointcloud.numPoints || pointcloud.geometry.attributes.position.count;
+                pointCountInfo.textContent = `点数: ${numPoints?.toLocaleString() || 'N/A'}`;
+
+                const bbox = pointcloud.boundingBox || pointcloud.geometry.boundingBox;
+                if (bbox) {
+                    boundsInfo.textContent = `边界: Min(${bbox.min.x.toFixed(2)}, ${bbox.min.y.toFixed(2)}, ${bbox.min.z.toFixed(2)}), Max(${bbox.max.x.toFixed(2)}, ${bbox.max.y.toFixed(2)}, ${bbox.max.z.toFixed(2)})`;
+                } else {
+                    boundsInfo.textContent = '边界: N/A';
+                }
 
             } catch (e) {
-                console.error("初始化查看器或加载点云时出错:", e);
+                console.error("加载失败:", e);
                 showError(`加载失败: ${e.message || '未知错误'}`);
-                loadingIndicator.style.display = 'none';
             }
-        }
-
-        function showError(message) {
-            errorDisplay.textContent = message;
-            errorDisplay.style.display = 'block';
-        }
-
-        // Start initialization only if plyUrl is valid
-        if (plyUrl) {
-             initializeViewer();
-        } else {
-             // If URL was missing or invalid, hide the initial loading indicator
-             loadingIndicator.style.display = 'none';
-        }
-
-
+        })();
     </script>
-
 </body>
 </html>
