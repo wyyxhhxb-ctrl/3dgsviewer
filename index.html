@@ -97,9 +97,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
-    <script type="module">
-        import { PLYLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/PLYLoader.js';
-
+    <script>
         // --- 获取URL参数 ---
         const urlParams = new URLSearchParams(window.location.search);
         let plyUrl = urlParams.get('ply');
@@ -167,7 +165,8 @@
             const fileName = url.split('/').pop().split('?')[0] || 'Unknown';
             fileNameSpan.textContent = fileName;
 
-            const loader = new PLYLoader();
+            // 使用 Three.js 内置的 PLYLoader
+            const loader = new THREE.PLYLoader(); // 直接使用全局 THREE 对象下的 PLYLoader
             loader.load(
                 url,
                 // onLoad 回调
