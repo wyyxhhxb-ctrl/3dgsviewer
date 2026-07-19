@@ -138,22 +138,26 @@
             console.error("未提供 PLY 文件 URL。请使用 '?ply=YOUR_PLY_URL' 参数。");
             showError("错误：未提供 PLY 文件 URL。请检查网址参数。");
             loadingIndicator.style.display = 'none'; // Hide initial loading message
-            return; // Stop execution if no URL is provided
-        }
-
-        // Sanitize the URL (basic check, consider more robust validation if needed)
-        try {
-            new URL(plyUrl); // This will throw an error if the URL is malformed
-        } catch (e) {
-            console.error("提供的 PLY URL 无效:", e);
-            showError("错误：提供的 PLY 文件 URL 无效。");
-            loadingIndicator.style.display = 'none';
-            return;
+             // Do not return here as we still want the script to run potentially later if URL changes, though typically this means failure.
+        } else {
+             // Sanitize the URL (basic check, consider more robust validation if needed)
+             try {
+                 new URL(plyUrl); // This will throw an error if the URL is malformed
+             } catch (e) {
+                 console.error("提供的 PLY URL 无效:", e);
+                 showError("错误：提供的 PLY 文件 URL 无效。");
+                 loadingIndicator.style.display = 'none';
+                 plyUrl = null; // Indicate failure
+             }
         }
 
 
         // --- Potree Viewer Initialization ---
         async function initializeViewer() {
+            if (!plyUrl) {
+                 console.warn("PLY URL 无效或缺失，无法初始化查看器。");
+                 return; // Exit if no valid URL
+            }
             try {
                 // Initialize Potree viewer instance
                 const viewer = await initPotreeViewer({
@@ -228,8 +232,14 @@
             errorDisplay.style.display = 'block';
         }
 
-        // Start initialization
-        initializeViewer();
+        // Start initialization only if plyUrl is valid
+        if (plyUrl) {
+             initializeViewer();
+        } else {
+             // If URL was missing or invalid, hide the initial loading indicator
+             loadingIndicator.style.display = 'none';
+        }
+
 
     </script>
 
