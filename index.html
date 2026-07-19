@@ -1,285 +1,264 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>3DGS 查看器（深色版）</title>
+    <meta charset="UTF-8">
+    <title>3DGS 查看器</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #1a1a1a;
-            color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            margin: 0;
+            overflow: hidden; /* 防止出现滚动条 */
+            background-color: #222; /* 深灰色背景 */
+            font-family: Arial, sans-serif;
+            color: white;
         }
-        .header {
-            padding: 12px 20px;
-            background: #252525;
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 10;
-        }
-        .title { font-size: 18px; font-weight: 600; color: #4fc3f7; }
-        .controls-info {
-            font-size: 14px;
-            background: rgba(0,0,0,0.4);
-            padding: 6px 12px;
-            border-radius: 20px;
-            display: flex;
-            gap: 15px;
-        }
-        .canvas-container {
-            flex: 1;
-            position: relative;
-        }
-        canvas {
-            display: block;
+        #container {
+            position: absolute;
             width: 100%;
             height: 100%;
-            background: #1a1a1a;
         }
-        .loading-overlay {
+        #infoPanel {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(26,26,26,0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 5;
+            top: 40px;
+            left: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
         }
-        .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid rgba(187,134,252,0.3);
-            border-top: 4px solid #bb86fc;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text {
-            margin-top: 20px;
-            font-size: 16px;
-            color: #bb86fc;
-        }
-        .error-message {
-            color: #f44336;
-            text-align: center;
-            max-width: 80%;
+        #loadingMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            z-index: 200;
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 20px;
-            background: rgba(244,67,54,0.1);
-            border-radius: 8px;
-            margin-top: 20px;
+            border-radius: 10px;
         }
-        .footer {
+        #controlsInfo {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
+            bottom: 10px;
+            left: 10px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
             font-size: 12px;
-            color: #777;
+            z-index: 100;
+        }
+        #errorPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            z-index: 200;
+            background-color: rgba(139, 0, 0, 0.7); /* 深红色背景表示错误 */
+            padding: 20px;
+            border-radius: 10px;
+            display: none; /* 默认隐藏 */
+        }
+        #pointcloudCounter {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="title">3DGS 点云查看器</div>
-        <div class="controls-info">
-            <span>🖱️ 拖拽旋转</span>
-            <span>🔍 滚轮缩放</span>
-            <span>🖱️+右键 平移</span>
-        </div>
+    <div id="container"></div>
+
+    <div id="infoPanel" style="display:none;">
+        <p><strong>文件:</strong> <span id="fileName">-</span></p>
+        <p><strong>点数:</strong> <span id="numPoints">-</span></p>
+        <!-- 可以添加更多模型信息 -->
     </div>
 
-    <div class="canvas-container">
-        <canvas id="viewerCanvas"></canvas>
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="spinner"></div>
-            <div class="loading-text">正在加载点云数据...</div>
-        </div>
-        <div class="footer">支持 ?ply=URL 参数加载模型</div>
+    <div id="loadingMessage">3DGS 查看器正在加载点云...</div>
+
+    <div id="errorPanel">
+        <p>加载失败或不支持的文件格式。</p>
+        <p id="errorMessageText">-</p>
     </div>
 
-    <!-- 使用较新且稳定的 Three.js 版本 -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/PLYLoader.js"></script>
+    <div id="controlsInfo">
+        <p>左键拖拽旋转 · 滚轮缩放 · 右键拖拽平移</p>
+    </div>
 
-    <script>
-        // 获取 URL 参数
-        function getUrlParameter(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
+     <div id="pointcloudCounter">
+        点云数量: <span id="pointCountDisplay">0</span>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script type="module">
+        import { PLYLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/PLYLoader.js';
+
+        // --- 获取URL参数 ---
+        const urlParams = new URLSearchParams(window.location.search);
+        let plyUrl = urlParams.get('ply');
+
+        // --- DOM 元素引用 ---
+        const container = document.getElementById('container');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorPanel = document.getElementById('errorPanel');
+        const errorMessageText = document.getElementById('errorMessageText');
+        const infoPanel = document.getElementById('infoPanel');
+        const fileNameSpan = document.getElementById('fileName');
+        const numPointsSpan = document.getElementById('numPoints');
+        const pointcloudCounter = document.getElementById('pointcloudCounter');
+        const pointCountDisplay = document.getElementById('pointCountDisplay');
+
+        // --- Three.js 初始化 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222); // 确保场景背景也是深灰
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio); // 提高高DPI屏幕渲染质量
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 启用阻尼效果，使旋转更流畅
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false; // 禁用平移的屏幕空间模式
+        controls.minDistance = 0.1; // 设置最小距离
+        controls.maxDistance = 1000; // 设置最大距离
+
+        // --- 环境光和方向光 ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // 柔和环境光
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight.position.set(1, 1, 1).normalize();
+        scene.add(directionalLight);
+
+        // --- 动画与渲染循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // 更新控制器状态（用于阻尼）
+            renderer.render(scene, camera);
         }
 
-        let scene, camera, renderer, controls, pointCloud;
-        const plyUrl = getUrlParameter('ply');
-
-        function init() {
-            // 场景
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a1a);
-
-            // 相机
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 5);
-
-            // 渲染器
-            const canvas = document.getElementById('viewerCanvas');
-            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
+        // --- 调整窗口大小 ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-            // 控制器
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-
-            // 加载模型或默认点云
-            if (plyUrl) {
-                loadPly(plyUrl);
-            } else {
-                createDefaultPointCloud();
-                hideLoading();
+        // --- 加载 PLY 文件 ---
+        function loadPLY(url) {
+            if (!url) {
+                showError("未提供 PLY 文件 URL。请使用 ?ply=your_ply_file_url 参数。");
+                return;
             }
 
-            window.addEventListener('resize', onWindowResize);
-            animate();
-        }
+            // 解析文件名
+            const fileName = url.split('/').pop().split('?')[0] || 'Unknown';
+            fileNameSpan.textContent = fileName;
 
-        function createDefaultPointCloud() {
-            const points = 10000;
-            const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(points * 3);
-            const colors = new Float32Array(points * 3);
-
-            for (let i = 0; i < points; i++) {
-                const i3 = i * 3;
-                positions[i3] = (Math.random() - 0.5) * 10;
-                positions[i3 + 1] = (Math.random() - 0.5) * 10;
-                positions[i3 + 2] = (Math.random() - 0.5) * 10;
-                colors[i3] = Math.random();
-                colors[i3 + 1] = Math.random();
-                colors[i3 + 2] = Math.random();
-            }
-
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-            const material = new THREE.PointsMaterial({
-                size: 0.05,
-                vertexColors: true,
-                sizeAttenuation: true
-            });
-
-            pointCloud = new THREE.Points(geometry, material);
-            scene.add(pointCloud);
-        }
-
-        function loadPly(url) {
-            const loader = new THREE.PLYLoader();
+            const loader = new PLYLoader();
             loader.load(
                 url,
+                // onLoad 回调
                 (geometry) => {
-                    // 确保有位置属性
-                    if (!geometry.getAttribute('position')) {
-                        showError('PLY 文件缺少 position 属性');
-                        return;
+                    console.log("PLY 加载成功", geometry);
+                    loadingMessage.style.display = 'none'; // 隐藏加载信息
+                    infoPanel.style.display = 'block'; // 显示信息面板
+                    numPointsSpan.textContent = geometry.attributes.position.count.toLocaleString();
+
+                    // 创建点材质
+                    let material;
+                    // 尝试使用颜色属性，如果不存在则使用默认颜色
+                    if (geometry.attributes.color) {
+                        material = new THREE.PointsMaterial({
+                            size: 0.01, // 根据模型大小调整点的尺寸
+                            vertexColors: true,
+                            sizeAttenuation: true
+                        });
+                         // 如果有颜色，尝试根据顶点位置调整点的大小
+                         const positions = geometry.attributes.position.array;
+                         const numPoints = positions.length / 3;
+                         const sizes = new Float32Array(numPoints);
+                         const initialSize = 0.01;
+                         for (let i = 0; i < numPoints; i++) {
+                             sizes[i] = initialSize;
+                         }
+                         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                         material = new THREE.PointsMaterial({
+                             size: initialSize,
+                             vertexColors: true,
+                             sizeAttenuation: true,
+                             // map: createPixelTexture(), // Optional: Use a small square texture instead of circle
+                         });
+                         material.size = initialSize; // Set initial size for non-buffered material
+                         material.sizeMin = 0.001;
+                         material.sizeMax = 0.05;
+                    } else {
+                        material = new THREE.PointsMaterial({
+                            size: 0.01,
+                            color: 0xdddddd, // 默认浅灰色
+                            sizeAttenuation: true
+                        });
                     }
 
-                    // 尝试获取颜色属性（兼容多种命名）
-                    let colorAttr = geometry.getAttribute('color');
-                    if (!colorAttr) colorAttr = geometry.getAttribute('rgba');
-                    if (!colorAttr) colorAttr = geometry.getAttribute('rgb');
-                    
-                    // 如果没有预定义的颜色属性，尝试从 red/green/blue 构建
-                    if (!colorAttr && geometry.hasAttribute('red')) {
-                        const n = geometry.getAttribute('position').count;
-                        const colors = new Float32Array(n * 3);
-                        const red = geometry.getAttribute('red').array;
-                        const green = geometry.getAttribute('green').array;
-                        const blue = geometry.getAttribute('blue').array;
-                        
-                        // 归一化到 [0,1]（PLY 中颜色常为 0-255）
-                        for (let i = 0; i < n; i++) {
-                            colors[i * 3] = red[i] / 255.0;
-                            colors[i * 3 + 1] = green[i] / 255.0;
-                            colors[i * 3 + 2] = blue[i] / 255.0;
-                        }
-                        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-                        colorAttr = geometry.getAttribute('color');
-                    }
-
-                    // 创建材质
-                    const material = new THREE.PointsMaterial({
-                        size: 0.02,
-                        vertexColors: !!colorAttr, // 仅当有颜色时启用
-                        sizeAttenuation: true
-                    });
-
-                    // 如果没有颜色，使用白色避免黑色
-                    if (!colorAttr) {
-                        material.color.set(0xffffff);
-                    }
-
-                    pointCloud = new THREE.Points(geometry, material);
+                    const pointCloud = new THREE.Points(geometry, material);
                     scene.add(pointCloud);
 
-                    // 自动聚焦
+                    // 计算边界框并调整相机初始位置
                     geometry.computeBoundingBox();
-                    const box = geometry.boundingBox;
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const fov = camera.fov * (Math.PI / 180);
-                    const fitHeightDistance = maxDim / (2 * Math.tan(fov / 2));
-                    const fitWidthDistance = fitHeightDistance / camera.aspect;
-                    const distance = Math.max(fitHeightDistance, fitWidthDistance) * 1.5;
+                    const boundingBox = geometry.boundingBox;
+                    const center = boundingBox.getCenter(new THREE.Vector3());
+                    const size = boundingBox.getSize(new THREE.Vector3()).length(); // 对角线长度作为参考大小
 
                     camera.position.copy(center);
-                    camera.position.z += distance;
+                    camera.position.x += size * 1.5; // 从侧面稍微拉开距离
+                    camera.position.y += size * 0.5; // 抬高一点
+                    camera.position.z += size * 1.5; // 向上看一点
                     camera.lookAt(center);
-                    controls.target.copy(center);
 
-                    hideLoading();
+                    controls.target.copy(center); // 设置旋转中心
+                    controls.update(); // 更新控制器
+
+                    // 更新点云计数器
+                    pointCountDisplay.textContent = geometry.attributes.position.count.toLocaleString();
                 },
-                undefined,
+                // onProgress 回调 (可选)
+                (xhr) => {
+                    if (xhr.lengthComputable) {
+                        const percentComplete = (xhr.loaded / xhr.total) * 100;
+                        console.log(`PLY 加载进度: ${percentComplete.toFixed(2)}%`);
+                        // 可以在这里更新UI上的进度条
+                    }
+                },
+                // onError 回调
                 (error) => {
                     console.error('PLY 加载失败:', error);
-                    showError('无法加载 PLY 文件。请检查 URL 是否有效且支持 CORS。');
+                    showError(`PLY 加载失败: ${error.message || error}`);
                 }
             );
         }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        function showError(message) {
+             loadingMessage.style.display = 'none'; // 隐藏加载信息
+             errorMessageText.textContent = message;
+             errorPanel.style.display = 'block';
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+        // --- 启动 ---
+        loadPLY(plyUrl); // 使用URL参数启动加载
+        animate(); // 开始动画循环
 
-        function hideLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            overlay.style.opacity = '0';
-            setTimeout(() => overlay.style.display = 'none', 300);
-        }
-
-        function showError(msg) {
-            const overlay = document.getElementById('loadingOverlay');
-            overlay.innerHTML = `<div class="error-message">${msg}</div>`;
-        }
-
-        // 启动
-        init();
     </script>
 </body>
 </html>
