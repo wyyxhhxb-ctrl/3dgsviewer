@@ -6,8 +6,8 @@
     <style>
         body {
             margin: 0;
-            overflow: hidden; /* 防止出现滚动条 */
-            background-color: #222; /* 深灰色背景 */
+            overflow: hidden;
+            background-color: #222;
             font-family: Arial, sans-serif;
             color: white;
         }
@@ -54,10 +54,10 @@
             transform: translate(-50%, -50%);
             font-size: 18px;
             z-index: 200;
-            background-color: rgba(139, 0, 0, 0.7); /* 深红色背景表示错误 */
+            background-color: rgba(139, 0, 0, 0.7);
             padding: 20px;
             border-radius: 10px;
-            display: none; /* 默认隐藏 */
+            display: none;
         }
         #pointcloudCounter {
             position: absolute;
@@ -77,7 +77,6 @@
     <div id="infoPanel" style="display:none;">
         <p><strong>文件:</strong> <span id="fileName">-</span></p>
         <p><strong>点数:</strong> <span id="numPoints">-</span></p>
-        <!-- 可以添加更多模型信息 -->
     </div>
 
     <div id="loadingMessage">3DGS 查看器正在加载点云...</div>
@@ -91,12 +90,17 @@
         <p>左键拖拽旋转 · 滚轮缩放 · 右键拖拽平移</p>
     </div>
 
-     <div id="pointcloudCounter">
+    <div id="pointcloudCounter">
         点云数量: <span id="pointCountDisplay">0</span>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <!-- 加载 Three.js 核心 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <!-- 加载 OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- 加载 PLYLoader（关键！必须显式加载） -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+
     <script>
         // --- 获取URL参数 ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -110,44 +114,43 @@
         const infoPanel = document.getElementById('infoPanel');
         const fileNameSpan = document.getElementById('fileName');
         const numPointsSpan = document.getElementById('numPoints');
-        const pointcloudCounter = document.getElementById('pointcloudCounter');
         const pointCountDisplay = document.getElementById('pointCountDisplay');
 
         // --- Three.js 初始化 ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x222222); // 确保场景背景也是深灰
+        scene.background = new THREE.Color(0x222222);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
+        camera.position.set(0, 0, 5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio); // 提高高DPI屏幕渲染质量
+        renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // 启用阻尼效果，使旋转更流畅
+        controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.screenSpacePanning = false; // 禁用平移的屏幕空间模式
-        controls.minDistance = 0.1; // 设置最小距离
-        controls.maxDistance = 1000; // 设置最大距离
+        controls.screenSpacePanning = false;
+        controls.minDistance = 0.1;
+        controls.maxDistance = 1000;
 
-        // --- 环境光和方向光 ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // 柔和环境光
+        // --- 光照 ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
         directionalLight.position.set(1, 1, 1).normalize();
         scene.add(directionalLight);
 
-        // --- 动画与渲染循环 ---
+        // --- 渲染循环 ---
         function animate() {
             requestAnimationFrame(animate);
-            controls.update(); // 更新控制器状态（用于阻尼）
+            controls.update();
             renderer.render(scene, camera);
         }
 
-        // --- 调整窗口大小 ---
+        // --- 响应窗口大小变化 ---
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -161,103 +164,59 @@
                 return;
             }
 
-            // 解析文件名
-            const fileName = url.split('/').pop().split('?')[0] || 'Unknown';
-            fileNameSpan.textContent = fileName;
+            fileNameSpan.textContent = url.split('/').pop().split('?')[0] || 'Unknown';
 
-            // 使用 Three.js 内置的 PLYLoader
-            const loader = new THREE.PLYLoader(); // 直接使用全局 THREE 对象下的 PLYLoader
+            const loader = new THREE.PLYLoader();
             loader.load(
                 url,
-                // onLoad 回调
                 (geometry) => {
-                    console.log("PLY 加载成功", geometry);
-                    loadingMessage.style.display = 'none'; // 隐藏加载信息
-                    infoPanel.style.display = 'block'; // 显示信息面板
-                    numPointsSpan.textContent = geometry.attributes.position.count.toLocaleString();
+                    loadingMessage.style.display = 'none';
+                    infoPanel.style.display = 'block';
 
-                    // 创建点材质
-                    let material;
-                    // 尝试使用颜色属性，如果不存在则使用默认颜色
-                    if (geometry.attributes.color) {
-                        material = new THREE.PointsMaterial({
-                            size: 0.01, // 根据模型大小调整点的尺寸
-                            vertexColors: true,
-                            sizeAttenuation: true
-                        });
-                         // 如果有颜色，尝试根据顶点位置调整点的大小
-                         const positions = geometry.attributes.position.array;
-                         const numPoints = positions.length / 3;
-                         const sizes = new Float32Array(numPoints);
-                         const initialSize = 0.01;
-                         for (let i = 0; i < numPoints; i++) {
-                             sizes[i] = initialSize;
-                         }
-                         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-                         material = new THREE.PointsMaterial({
-                             size: initialSize,
-                             vertexColors: true,
-                             sizeAttenuation: true,
-                             // map: createPixelTexture(), // Optional: Use a small square texture instead of circle
-                         });
-                         material.size = initialSize; // Set initial size for non-buffered material
-                         material.sizeMin = 0.001;
-                         material.sizeMax = 0.05;
-                    } else {
-                        material = new THREE.PointsMaterial({
-                            size: 0.01,
-                            color: 0xdddddd, // 默认浅灰色
-                            sizeAttenuation: true
-                        });
-                    }
+                    const numPoints = geometry.attributes.position.count;
+                    numPointsSpan.textContent = numPoints.toLocaleString();
+                    pointCountDisplay.textContent = numPoints.toLocaleString();
+
+                    // 材质：支持颜色或默认灰
+                    const material = geometry.attributes.color
+                        ? new THREE.PointsMaterial({ size: 0.01, vertexColors: true, sizeAttenuation: true })
+                        : new THREE.PointsMaterial({ size: 0.01, color: 0xdddddd, sizeAttenuation: true });
 
                     const pointCloud = new THREE.Points(geometry, material);
                     scene.add(pointCloud);
 
-                    // 计算边界框并调整相机初始位置
+                    // 自动聚焦
                     geometry.computeBoundingBox();
-                    const boundingBox = geometry.boundingBox;
-                    const center = boundingBox.getCenter(new THREE.Vector3());
-                    const size = boundingBox.getSize(new THREE.Vector3()).length(); // 对角线长度作为参考大小
+                    const bbox = geometry.boundingBox;
+                    const center = bbox.getCenter(new THREE.Vector3());
+                    const size = bbox.getSize(new THREE.Vector3()).length();
 
                     camera.position.copy(center);
-                    camera.position.x += size * 1.5; // 从侧面稍微拉开距离
-                    camera.position.y += size * 0.5; // 抬高一点
-                    camera.position.z += size * 1.5; // 向上看一点
+                    camera.position.x += size * 1.5;
+                    camera.position.y += size * 0.5;
+                    camera.position.z += size * 1.5;
                     camera.lookAt(center);
 
-                    controls.target.copy(center); // 设置旋转中心
-                    controls.update(); // 更新控制器
-
-                    // 更新点云计数器
-                    pointCountDisplay.textContent = geometry.attributes.position.count.toLocaleString();
+                    controls.target.copy(center);
+                    controls.update();
                 },
-                // onProgress 回调 (可选)
-                (xhr) => {
-                    if (xhr.lengthComputable) {
-                        const percentComplete = (xhr.loaded / xhr.total) * 100;
-                        console.log(`PLY 加载进度: ${percentComplete.toFixed(2)}%`);
-                        // 可以在这里更新UI上的进度条
-                    }
-                },
-                // onError 回调
+                undefined, // onProgress
                 (error) => {
                     console.error('PLY 加载失败:', error);
-                    showError(`PLY 加载失败: ${error.message || error}`);
+                    showError(`加载失败: ${error.message || '未知错误'}`);
                 }
             );
         }
 
         function showError(message) {
-             loadingMessage.style.display = 'none'; // 隐藏加载信息
-             errorMessageText.textContent = message;
-             errorPanel.style.display = 'block';
+            loadingMessage.style.display = 'none';
+            errorMessageText.textContent = message;
+            errorPanel.style.display = 'block';
         }
 
-        // --- 启动 ---
-        loadPLY(plyUrl); // 使用URL参数启动加载
-        animate(); // 开始动画循环
-
+        // 启动
+        loadPLY(plyUrl);
+        animate();
     </script>
 </body>
 </html>
